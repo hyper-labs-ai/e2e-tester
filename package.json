@@ -1,0 +1,40 @@
+{
+  "name": "e2e-tester",
+  "version": "1.0.0",
+  "description": "End-to-End testing specialist: generate E2E test plans AND execute them via Playwright browser automation",
+  "keywords": [
+    "e2e",
+    "testing",
+    "playwright",
+    "browser",
+    "automation",
+    "qa",
+    "agent"
+  ],
+  "homepage": "https://github.com/hyper-labs-ai/e2e-tester",
+  "license": "MIT",
+  "author": "Hyper Labs AI",
+  "type": "module",
+  "scripts": {
+    "install": "bash scripts/install.sh",
+    "package": "bash scripts/package.sh",
+    "format": "npx prettier --write .",
+    "list": "npx tsx scripts/e2e-plan-manager.ts list",
+    "validate": "npx tsx scripts/e2e-plan-manager.ts validate",
+    "scaffold": "npx tsx scripts/e2e-plan-manager.ts scaffold"
+  },
+  "dependencies": {
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "primitive/",
+    "scripts/",
+    "references/",
+    "workflows/",
+    "README.md",
+    "LICENSE"
+  ]
+}
