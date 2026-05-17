@@ -1,12 +1,12 @@
 {
   "name": "e2e-test-workflow",
-  "version": "1.0",
-  "description": "End-to-End testing workflow: generate E2E test plans, execute them, and report results",
+  "version": "2.0",
+  "description": "End-to-End testing workflow: execute existing E2E test plans or generate new ones, run them, and report results",
   "config": {
-    "parallelLimit": 2,
+    "parallelLimit": 1,
     "continueOnError": true,
-    "timeout": 3600,
-    "maxRetries": 2
+    "timeout": 7200,
+    "maxRetries": 1
   },
   "inputs": {
     "target_url": {
@@ -15,18 +15,18 @@
       "default": "http://localhost:5173",
       "description": "URL of the application to test"
     },
-    "scope": {
-      "type": "string",
-      "required": false,
-      "default": "auto",
-      "description": "Scope of testing: 'auto' (discover), 'all', or comma-separated subproject names"
-    },
     "mode": {
       "type": "string",
       "required": false,
       "default": "execute",
-      "description": "What to do: create plans, execute plans, or both",
-      "enum": ["create", "execute", "both"]
+      "description": "What to do: execute plans, or both (create if empty + execute)",
+      "enum": ["execute", "both"]
+    },
+    "scope": {
+      "type": "string",
+      "required": false,
+      "default": "all",
+      "description": "Which plans to run: 'all' or comma-separated plan names"
     },
     "auth_method": {
       "type": "string",
@@ -45,44 +45,24 @@
   },
   "nodes": [
     {
-      "id": "discover_project",
+      "id": "check_plans",
       "type": "primitive",
       "primitive": "e2e-tester",
-      "description": "Scan the project to discover structure and existing plans",
+      "description": "Check for existing plans and execute or create them",
       "inputs": {
-        "mode": "create"
-      }
-    },
-    {
-      "id": "execute_tests",
-      "type": "primitive",
-      "primitive": "e2e-tester",
-      "description": "Execute E2E test plans",
-      "inputs": {
-        "mode": "execute",
+        "mode": "{{inputs.mode === 'both' ? 'execute' : inputs.mode}}",
         "target_url": "{{inputs.target_url}}"
-      }
-    },
-    {
-      "id": "generate_report",
-      "type": "primitive",
-      "primitive": "e2e-tester",
-      "description": "Generate comprehensive test execution report",
-      "inputs": {
-        "mode": "execute"
       }
     }
   ],
-  "edges": [
-    { "from": "discover_project", "to": "execute_tests" },
-    { "from": "execute_tests", "to": "generate_report" }
-  ],
+  "edges": [],
   "output": {
-    "summary": "{{execute_tests.summary}}",
-    "tests_executed": "{{execute_tests.plans_executed.length}}",
-    "passed": "{{execute_tests.test_results.passed}}",
-    "failed": "{{execute_tests.test_results.failed}}",
-    "issues": "{{execute_tests.test_results.issues_filed}}",
-    "report": "{{generate_report.report_file}}"
+    "summary": "{{check_plans.summary}}",
+    "plans_created": "{{check_plans.plans_created}}",
+    "plans_executed": "{{check_plans.plans_executed}}",
+    "passed": "{{check_plans.test_results.passed}}",
+    "failed": "{{check_plans.test_results.failed}}",
+    "issues": "{{check_plans.test_results.issues_filed}}",
+    "report": "{{check_plans.report_file}}"
   }
 }

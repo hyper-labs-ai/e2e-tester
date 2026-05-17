@@ -81,13 +81,15 @@ trap "rm -rf '$BUILD_DIR'" EXIT
 
 # Create package structure
 PACKAGE_DIR="$BUILD_DIR/$FILENAME"
-mkdir -p "$PACKAGE_DIR"/{primitive,scripts,references,workflows,tests}
+mkdir -p "$PACKAGE_DIR"/{primitive,scripts,references,workflows}
 
 # Copy files
+cp "$REPO_DIR/AGENTS.md" "$PACKAGE_DIR/" 2>/dev/null || true
 cp "$REPO_DIR/README.md" "$PACKAGE_DIR/"
 cp "$REPO_DIR/LICENSE" "$PACKAGE_DIR/"
 cp "$REPO_DIR/package.json" "$PACKAGE_DIR/"
-cp "$REPO_DIR/.gitignore" "$PACKAGE_DIR/" 2>/dev/null || true
+cp "$REPO_DIR/package-lock.json" "$PACKAGE_DIR/" 2>/dev/null || true
+cp "$REPO_DIR/tsconfig.json" "$PACKAGE_DIR/" 2>/dev/null || true
 
 cp "$REPO_DIR/primitive/e2e-tester.json" "$PACKAGE_DIR/primitive/"
 cp "$REPO_DIR/scripts/e2e-plan-manager.ts" "$PACKAGE_DIR/scripts/"

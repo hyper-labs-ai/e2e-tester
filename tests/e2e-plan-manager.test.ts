@@ -2,9 +2,12 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 
-const scriptDir = path.resolve(import.meta.dirname, "..", "scripts");
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const scriptDir = path.resolve(__dirname, "..", "scripts");
 const planManager = path.join(scriptDir, "e2e-plan-manager.ts");
 
 async function loadFunctions(): Promise<{
@@ -22,12 +25,14 @@ async function loadFunctions(): Promise<{
     edgeCases: number;
     hasCleanup: boolean;
   }>;
+  analyzeRouting: (content: string) => { tier: string; reason: string };
   padRight: (s: string, n: number) => string;
 }> {
   const mod = await import(planManager);
   return {
     parsePlanMeta: mod.parsePlanMeta,
     parseWorkflows: mod.parseWorkflows,
+    analyzeRouting: mod.analyzeRouting,
     padRight: mod.padRight,
   };
 }
@@ -192,6 +197,60 @@ async function main() {
       assert.equal(wfs.length, 0);
     });
 
+    // ── analyzeRouting ──────────────────────────────────────────────────
+    await test("analyzeRouting detects specific selectors → Tier A", () => {
+      const result = fns.analyzeRouting(
+        '[data-testid="login"] button:has-text("Submit") #main-form .btn-primary getByRole getByTestId',
+      );
+      assert.equal(result.tier, "A");
+    });
+
+    await test("analyzeRouting detects mixed patterns → Tier B", () => {
+      const result = fns.analyzeRouting(
+        "Click the submit button. getByTestId('login-form') #email-input waitForSelector('[data-ready=true]') and verify the dashboard looks correct",
+      );
+      assert.equal(result.tier, "B");
+    });
+
+    await test("analyzeRouting detects vague patterns → Tier C", () => {
+      const result = fns.analyzeRouting(
+        "Click the submit button. Verify the layout looks correct. Use manual judgment to check appearance.",
+      );
+      assert.equal(result.tier, "C");
+    });
+
+    await test("analyzeRouting detects CAPTCHA → Tier C", () => {
+      const result = fns.analyzeRouting(
+        "Complete the reCAPTCHA challenge before proceeding",
+      );
+      assert.equal(result.tier, "C");
+    });
+
+    await test("analyzeRouting detects MFA/2FA → Tier C", () => {
+      const result = fns.analyzeRouting(
+        "Enter the MFA code from authenticator app",
+      );
+      assert.equal(result.tier, "C");
+    });
+
+    await test("analyzeRouting no patterns → Tier B (fallback)", () => {
+      const result = fns.analyzeRouting(
+        "This workflow has no clear selectors or patterns at all",
+      );
+      assert.equal(result.tier, "B");
+    });
+
+    await test("analyzeRouting very specific with strong ratio → Tier A", () => {
+      const result = fns.analyzeRouting(`
+        getByRole('button', { name: 'Submit' })
+        getByTestId('user-profile')
+        #main-header .nav-item
+        waitForSelector('[data-loading="false"]')
+        locator('[data-testid="list"]').first()
+      `);
+      assert.equal(result.tier, "A");
+    });
+
     // ── CLI commands (smoke tests) ─────────────────────────────────────
     await test("check command returns 'absent' when no .e2e-plans/", async () => {
       const result = await runCli("check");
@@ -202,8 +261,65 @@ async function main() {
       const result = await runCli("list");
       assert.ok(result.includes("No .e2e-plans"));
     });
+
+    await test("validate on missing directory fails gracefully", async () => {
+      const result = await runCli("validate");
+      assert.ok(result.includes("No .e2e-plans"));
+    });
+
+    await test("route on missing directory fails gracefully", async () => {
+      const result = await runCli("route");
+      assert.ok(result.includes("No .e2e-plans"));
+    });
+
+    // ── scaffold CLI test ──────────────────────────────────────────────
+    await test("scaffold creates .e2e-plans/ directory", async () => {
+      const scaffoldDir = fs.mkdtempSync(
+        path.join(os.tmpdir(), "e2e-scaffold-"),
+      );
+      try {
+        const { execSync } = await import("node:child_process");
+        execSync(`npx tsx ${planManager} scaffold`, {
+          encoding: "utf-8",
+          cwd: scaffoldDir,
+        });
+        assert.ok(fs.existsSync(path.join(scaffoldDir, ".e2e-plans")));
+        assert.ok(fs.existsSync(path.join(scaffoldDir, ".e2e-plans/results")));
+        assert.ok(fs.existsSync(path.join(scaffoldDir, ".e2e-plans/scripts")));
+        assert.ok(
+          fs.existsSync(path.join(scaffoldDir, ".e2e-plans/screenshots")),
+        );
+        assert.ok(fs.existsSync(path.join(scaffoldDir, ".e2e-plans/issues")));
+        assert.ok(
+          fs.existsSync(path.join(scaffoldDir, ".e2e-plans/README.md")),
+        );
+      } finally {
+        fs.rmSync(scaffoldDir, { recursive: true, force: true });
+      }
+    });
+
+    await test("scaffold is idempotent (no error on re-run)", async () => {
+      const scaffoldDir = fs.mkdtempSync(path.join(os.tmpdir(), "e2e-idem-"));
+      try {
+        const { execSync } = await import("node:child_process");
+        execSync(`npx tsx ${planManager} scaffold`, {
+          encoding: "utf-8",
+          cwd: scaffoldDir,
+        });
+        execSync(`npx tsx ${planManager} scaffold`, {
+          encoding: "utf-8",
+          cwd: scaffoldDir,
+        });
+        assert.ok(fs.existsSync(path.join(scaffoldDir, ".e2e-plans")));
+      } finally {
+        fs.rmSync(scaffoldDir, { recursive: true, force: true });
+      }
+    });
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
+    if (_cliTmpDir) {
+      fs.rmSync(_cliTmpDir, { recursive: true, force: true });
+    }
   }
 
   // ── Summary ──────────────────────────────────────────────────────────

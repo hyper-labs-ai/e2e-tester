@@ -46,10 +46,25 @@ print_skip() { echo -e "  ${YELLOW}→${NC} $1"; }
 print_err()  { echo -e "  ${RED}✗${NC} $1"; }
 
 do_install() {
+    if [ "$MODE" = "dry-run" ]; then
+        print_step "[DRY RUN] Would install E2E Tester v${VERSION} to ${PREFIX}"
+        echo ""
+        echo "  Files to install:"
+        for src in "${!FILES[@]}"; do
+            echo "    ${src} → ${FILES[$src]}"
+        done
+        for src in "${!SELFCONTAINED[@]}"; do
+            echo "    ${src} → ${SELFCONTAINED[$src]}"
+        done
+        echo ""
+        print_ok "Dry run complete — no changes made"
+        return
+    fi
+
     print_step "Installing E2E Tester v${VERSION} to ${PREFIX}"
 
     # Create target directories
-    mkdir -p "$PREFIX"/{primitive,scripts,references,workflows,tests}
+    mkdir -p "$PREFIX"/{primitive,scripts,references,workflows}
     mkdir -p "$BUILDER_DIR"/primitives/definitions
     mkdir -p "$BUILDER_DIR"/scripts
     mkdir -p "$BUILDER_DIR"/references

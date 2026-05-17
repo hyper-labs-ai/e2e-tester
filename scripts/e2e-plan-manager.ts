@@ -241,6 +241,7 @@ function cmdScaffold() {
   fs.mkdirSync(path.join(dir, "results"), { recursive: true });
   fs.mkdirSync(path.join(dir, "scripts"), { recursive: true });
   fs.mkdirSync(path.join(dir, "screenshots"), { recursive: true });
+  fs.mkdirSync(path.join(dir, "issues"), { recursive: true });
 
   const readme = `# E2E Test Plans
 
@@ -254,7 +255,8 @@ This directory contains End-to-End (E2E) test plans for this project.
 ├── *.md                   # Individual plan files
 ├── results/               # Test execution reports
 ├── scripts/               # Generated Playwright test scripts
-└── screenshots/           # Screenshots captured during execution
+├── screenshots/           # Screenshots captured during execution
+└── issues/                # Filed issue reports from test failures
 \`\`\`
 
 ## Plans
@@ -282,6 +284,7 @@ ${MANAGER_PATH} index
   console.log(`  ${CYAN}.e2e-plans/results/${RESET}`);
   console.log(`  ${CYAN}.e2e-plans/scripts/${RESET}`);
   console.log(`  ${CYAN}.e2e-plans/screenshots/${RESET}`);
+  console.log(`  ${CYAN}.e2e-plans/issues/${RESET}`);
 }
 
 function cmdIndex() {
@@ -334,7 +337,8 @@ This directory contains End-to-End (E2E) test plans for this project.
 ├── *.md                   # Individual plan files
 ├── results/               # Test execution reports
 ├── scripts/               # Generated Playwright test scripts
-└── screenshots/           # Screenshots captured during execution
+├── screenshots/           # Screenshots captured during execution
+└── issues/                # Filed issue reports from test failures
 \`\`\`
 
 ## Plans
@@ -444,52 +448,81 @@ function cmdValidate(planName?: string) {
 }
 
 export function analyzeRouting(content: string): {
-  phase: string;
+  tier: string;
   reason: string;
 } {
   const vaguePatterns = [
     /\bthe (login|submit|register|button|link|form|menu)\b/i,
     /\b(verify|check|ensure|validate)\s+(layout|appearance|visual|look)/i,
-    /\b(manually|interactive|judgment)\b/i,
+    /\b(manually|interactive|judg(e)?ment)\b/i,
     /CAPTCHA|MFA|OAuth|2FA/i,
+    /(?:click|press|hit)\s+the\s+\w+\s+(button|link|icon)/i,
+    /should\s+(be|appear|show|display)\s+(correct|proper|appropriate)/i,
+    /\b(unpredictable|random|dynamic|unknown)\s+(element|selector|content)/i,
   ];
 
   const specificPatterns = [
-    /data-testid|data-test|aria-label/i,
-    /\[.*\]|#\w+|\.\w+/,
-    /button:text|page\.\w+|input\[/i,
-    /waitFor|waitForSelector|waitForURL|waitForLoadState/i,
+    /data-testid|data-test|data-cy|data-test-id/i,
+    /\[.*(?:role|aria-label|name|type|placeholder|href).*\]/i,
+    /#[\w-]+/,
+    /\.[\w-]+/,
+    /button:text|button:has-text|page\.\w+|input\[/i,
+    /getByRole|getByText|getByLabel|getByPlaceholder|getByTestId/i,
+    /waitForSelector|waitForURL|waitForLoadState|waitForResponse/i,
+    /locator\s*\(/i,
+    /nth\(|first\(|last\(|filter\(/i,
+    /\[\w+\]=/,
+    /text=["']/,
+    /selector:\s*["']/,
+    /target:\s*["']/,
   ];
 
-  const lower = content.toLowerCase();
   const vagueHits = vaguePatterns.filter((r) => r.test(content)).length;
   const specificHits = specificPatterns.filter((r) => r.test(content)).length;
 
-  if (vagueHits > 0 && specificHits === 0) {
+  // Check for blockers first
+  if (
+    /\b(CAPTCHA|reCAPTCHA|turnstile|hCaptcha)\b/i.test(content) ||
+    /\b(MFA|2FA|multi-factor|two.?factor)\b/i.test(content)
+  ) {
     return {
-      phase: "B",
+      tier: "C",
       reason:
-        "Steps contain vague selectors/instructions without specific alternatives; falls back to interactive control.",
+        "Unpredictable elements (CAPTCHA/MFA/2FA) detected; requires interactive handling.",
     };
   }
-  if (content.includes("CAPTCHA") || content.includes("MFA")) {
+
+  // Compute ratio and absolute thresholds
+  const ratio =
+    specificHits + vagueHits > 0
+      ? specificHits / (specificHits + vagueHits)
+      : 0;
+
+  if (specificHits >= 3 && ratio >= 0.67) {
     return {
-      phase: "B",
-      reason:
-        "Unpredictable elements (CAPTCHA/MFA/OAuth) require interactive handling.",
+      tier: "A",
+      reason: `Strongly specific selectors (${specificHits} specific vs ${vagueHits} vague signals); suitable for automated script generation.`,
     };
   }
-  if (vagueHits > specificHits) {
+
+  if (specificHits >= 1 && specificHits >= vagueHits && ratio >= 0.5) {
     return {
-      phase: "B",
-      reason:
-        "More vague patterns than specific selectors; recommended to use interactive fallback.",
+      tier: "B",
+      reason: `Mix of specific and vague patterns (${specificHits} specific, ${vagueHits} vague); use guided code execution via playwright_browser_run_code_unsafe.`,
     };
   }
+
+  if (vagueHits === 0 && specificHits === 0) {
+    return {
+      tier: "B",
+      reason:
+        "No clear selectors or patterns detected; use guided code execution or interactive fallback based on inspection.",
+    };
+  }
+
   return {
-    phase: "A",
-    reason:
-      "Steps appear well-defined with specific selectors; suitable for Playwright script generation.",
+    tier: "C",
+    reason: `Predominantly vague or ambiguous patterns (${vagueHits} vague, ${specificHits} specific); requires interactive step-by-step execution.`,
   };
 }
 
@@ -515,17 +548,21 @@ function cmdRoute(planName?: string) {
 
   console.log(`\n${BOLD}${BLUE}Hybrid Execution Routing${RESET}\n`);
   console.log(
-    `${CYAN}Phase A${RESET} = Playwright script generation  |  ${CYAN}Phase B${RESET} = Interactive browser control\n`,
+    `${CYAN}Tier A${RESET} = Automated script generation  |  ${CYAN}Tier B${RESET} = Guided code execution (run_code_unsafe)  |  ${CYAN}Tier C${RESET} = Interactive step-by-step\n`,
   );
 
   for (const filePath of files) {
     const meta = parsePlanMeta(filePath);
     const content = fs.readFileSync(filePath, "utf-8");
     const routing = analyzeRouting(content);
+    const tierColor =
+      routing.tier === "A"
+        ? `${GREEN}Tier ${routing.tier}${RESET}`
+        : routing.tier === "B"
+          ? `${YELLOW}Tier ${routing.tier}${RESET}`
+          : `${RED}Tier ${routing.tier}${RESET}`;
 
-    console.log(
-      `${BOLD}${meta.name}${RESET} → ${routing.phase === "A" ? `${GREEN}Phase ${routing.phase}${RESET}` : `${YELLOW}Phase ${routing.phase}${RESET}`}`,
-    );
+    console.log(`${BOLD}${meta.name}${RESET} → ${tierColor}`);
     console.log(`  ${routing.reason}`);
 
     const workflows = parseWorkflows(filePath);
@@ -558,7 +595,7 @@ ${CYAN}Commands:${RESET}
     ${GREEN}index${RESET}                  Generate/update README index
     ${GREEN}check${RESET}                  Check if plans exist (output: absent|empty|list)
     ${GREEN}validate${RESET} [plan-name]   Validate plan structure (all or specific)
-    ${GREEN}route${RESET} [plan-name]      Show hybrid execution routing (Phase A vs Phase B)
+    ${GREEN}route${RESET} [plan-name]      Show hybrid execution routing (Tier A/B/C)
 
 ${CYAN}Examples:${RESET}
     npx tsx ${__dirname}/e2e-plan-manager.ts list

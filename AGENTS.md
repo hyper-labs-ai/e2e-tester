@@ -5,12 +5,12 @@ This repo defines the **E2E Tester** agent primitive for the Agent Composition S
 ## Architecture
 
 - `primitive/e2e-tester.json` — agent prompt, tool list, and I/O schema (the core artifact)
-- `scripts/e2e-plan-manager.ts` — CLI for `.e2e-plans/` management (list, show, scaffold, index, check, validate)
+- `scripts/e2e-plan-manager.ts` — CLI for `.e2e-plans/` management (list, show, scaffold, index, check, validate, route)
 - `scripts/install.sh` — deploys to `~/.agents/` (supports `--symlink` for live dev)
 - `scripts/package.sh` — builds release tarball to `dist/`
 - `references/e2e-execution-guide.md` — hybrid execution instructions consumed by the agent at runtime
 - `workflows/e2e-test-workflow.json` — DAG workflow for the Composer system
-- `tests/` — empty; no test framework is set up yet
+- `tests/e2e-plan-manager.test.ts` — test suite for the plan manager CLI
 
 ## Developer Commands
 
@@ -24,7 +24,7 @@ npm run route         # npx tsx scripts/e2e-plan-manager.ts route [plan-name]
 npm run test          # npx tsx tests/e2e-plan-manager.test.ts
 ```
 
-TypeScript is run directly via `npx tsx` (no tsconfig in the repo).
+TypeScript is run directly via `npx tsx`.
 
 ## Dev Workflow
 

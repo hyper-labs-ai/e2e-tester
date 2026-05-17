@@ -1,6 +1,6 @@
 {
   "name": "e2e-tester",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "End-to-End testing specialist: generate E2E test plans AND execute them via Playwright browser automation",
   "keywords": [
     "e2e",
@@ -20,8 +20,11 @@
     "package": "bash scripts/package.sh",
     "format": "npx prettier --write .",
     "list": "npx tsx scripts/e2e-plan-manager.ts list",
+    "show": "npx tsx scripts/e2e-plan-manager.ts show",
     "validate": "npx tsx scripts/e2e-plan-manager.ts validate",
     "scaffold": "npx tsx scripts/e2e-plan-manager.ts scaffold",
+    "index": "npx tsx scripts/e2e-plan-manager.ts index",
+    "check": "npx tsx scripts/e2e-plan-manager.ts check",
     "test": "npx tsx tests/e2e-plan-manager.test.ts",
     "route": "npx tsx scripts/e2e-plan-manager.ts route"
   },
