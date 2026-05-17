@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # E2E Tester — one-command installer
-#   curl -fsSL https://raw.githubusercontent.com/hyper-labs-ai/e2e-tester/main/install.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/hyper-labs-ai/e2e-tester/main/install.sh | bash -s -- --symlink
+#   curl -fsSL https://raw.githubusercontent.com/hyper-labs-ai/e2e-tester/master/scripts/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/hyper-labs-ai/e2e-tester/master/scripts/install.sh | bash -s -- --symlink
 
 REPO="hyper-labs-ai/e2e-tester"
 BRANCH="${BRANCH:-main}"
@@ -29,9 +29,9 @@ usage() {
 ${BLUE}E2E Tester Installer${NC}
 
 ${CYAN}Usage:${NC}
-    curl -fsSL https://raw.githubusercontent.com/${REPO}/${BRANCH}/install.sh | bash
-    curl -fsSL https://raw.githubusercontent.com/${REPO}/${BRANCH}/install.sh | bash -s -- --symlink
-    curl -fsSL https://raw.githubusercontent.com/${REPO}/${BRANCH}/install.sh | bash -s -- --prefix ~/custom
+    curl -fsSL https://raw.githubusercontent.com/${REPO}/${BRANCH}/scripts/install.sh | bash
+    curl -fsSL https://raw.githubusercontent.com/${REPO}/${BRANCH}/scripts/install.sh | bash -s -- --symlink
+    curl -fsSL https://raw.githubusercontent.com/${REPO}/${BRANCH}/scripts/install.sh | bash -s -- --prefix ~/custom
 
 ${CYAN}Options:${NC}
     --symlink     Symlink for development (Linux/macOS)

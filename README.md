@@ -39,7 +39,7 @@ e2e-tester/
 **Linux / macOS — one command:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hyper-labs-ai/e2e-tester/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hyper-labs-ai/e2e-tester/master/scripts/install.sh | bash
 ```
 
 That's it. Downloads, extracts, installs to `~/.agents/`. No manual steps.
@@ -47,13 +47,13 @@ That's it. Downloads, extracts, installs to `~/.agents/`. No manual steps.
 **With dev symlinks:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hyper-labs-ai/e2e-tester/main/install.sh | bash -s -- --symlink
+curl -fsSL https://raw.githubusercontent.com/hyper-labs-ai/e2e-tester/master/scripts/install.sh | bash -s -- --symlink
 ```
 
 **Windows — one command (Git Bash / WSL):**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hyper-labs-ai/e2e-tester/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hyper-labs-ai/e2e-tester/master/scripts/install.sh | bash
 ```
 
 **Windows (native PowerShell) — one command:**
