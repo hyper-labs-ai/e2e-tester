@@ -21,7 +21,9 @@
     "format": "npx prettier --write .",
     "list": "npx tsx scripts/e2e-plan-manager.ts list",
     "validate": "npx tsx scripts/e2e-plan-manager.ts validate",
-    "scaffold": "npx tsx scripts/e2e-plan-manager.ts scaffold"
+    "scaffold": "npx tsx scripts/e2e-plan-manager.ts scaffold",
+    "test": "npx tsx tests/e2e-plan-manager.test.ts",
+    "route": "npx tsx scripts/e2e-plan-manager.ts route"
   },
   "dependencies": {
     "typescript": "^5.0.0"
@@ -36,5 +38,8 @@
     "workflows/",
     "README.md",
     "LICENSE"
-  ]
+  ],
+  "devDependencies": {
+    "@types/node": "^25.8.0"
+  }
 }

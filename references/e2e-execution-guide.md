@@ -25,7 +25,7 @@ Generate Playwright test scripts when ALL of these are true:
 ```typescript
 import { chromium, Browser, Page } from "playwright";
 
-const APP_URL = process.env.APP_URL || "http://localhost:5173";
+const APP_URL = process.env.APP_URL || "{{target_url}}";
 
 async function run() {
   const browser = await chromium.launch({ headless: true });

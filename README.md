@@ -17,14 +17,14 @@ The E2E Tester operates in two modes:
 e2e-tester/
 ├── primitive/e2e-tester.json     # Agent primitive definition (prompt, tools, inputs)
 ├── scripts/
-│   ├── e2e-plan-manager.ts       # CLI for plan management (list, show, validate, scaffold)
+│   ├── e2e-plan-manager.ts       # CLI for plan management (list, show, validate, scaffold, route)
 │   ├── install.sh                # Deploy to agent system
 │   └── package.sh                # Build release tarball
 ├── references/
 │   └── e2e-execution-guide.md    # Hybrid execution approach reference
 ├── workflows/
 │   └── e2e-test-workflow.json    # Reusable DAG workflow example
-└── tests/                        # (coming soon)
+└── tests/                        # Plan manager tests
 ```
 
 ## Prerequisites
@@ -78,6 +78,7 @@ agent-compose e2e show <name>    # Show plan details
 agent-compose e2e scaffold       # Create .e2e-plans/ structure
 agent-compose e2e index          # Rebuild README index
 agent-compose e2e validate       # Check plan structure
+agent-compose e2e route [name]  # Show hybrid execution routing
 ```
 
 If you don't have the `agent-compose` CLI, use the helper script directly:
@@ -87,6 +88,7 @@ npx tsx scripts/e2e-plan-manager.ts list
 npx tsx scripts/e2e-plan-manager.ts show <plan-name>
 npx tsx scripts/e2e-plan-manager.ts scaffold
 npx tsx scripts/e2e-plan-manager.ts validate
+npx tsx scripts/e2e-plan-manager.ts route [plan-name]
 ```
 
 ## CREATE Mode

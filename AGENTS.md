@@ -20,6 +20,8 @@ npm run package       # bash scripts/package.sh
 npm run list          # npx tsx scripts/e2e-plan-manager.ts list
 npm run validate      # npx tsx scripts/e2e-plan-manager.ts validate
 npm run scaffold      # npx tsx scripts/e2e-plan-manager.ts scaffold
+npm run route         # npx tsx scripts/e2e-plan-manager.ts route [plan-name]
+npm run test          # npx tsx tests/e2e-plan-manager.test.ts
 ```
 
 TypeScript is run directly via `npx tsx` (no tsconfig in the repo).

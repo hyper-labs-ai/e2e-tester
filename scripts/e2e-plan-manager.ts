@@ -17,19 +17,19 @@ const CYAN = "\x1b[36m";
 const BOLD = "\x1b[1m";
 const RESET = "\x1b[0m";
 
-function findProjectRoot(): string {
-  let dir = process.cwd();
-  while (dir !== "/") {
-    if (
-      fs.existsSync(path.join(dir, "package.json")) ||
-      fs.existsSync(path.join(dir, ".git"))
-    ) {
-      return dir;
-    }
-    dir = path.dirname(dir);
-  }
-  return process.cwd();
-}
+// function findProjectRoot(): string {
+//   let dir = process.cwd();
+//   while (dir !== "/") {
+//     if (
+//       fs.existsSync(path.join(dir, "package.json")) ||
+//       fs.existsSync(path.join(dir, ".git"))
+//     ) {
+//       return dir;
+//     }
+//     dir = path.dirname(dir);
+//   }
+//   return process.cwd();
+// }
 
 function plansDir(): string {
   return path.resolve(process.cwd(), ".e2e-plans");
@@ -51,7 +51,7 @@ interface WorkflowBlock {
   hasCleanup: boolean;
 }
 
-function parsePlanMeta(filePath: string): PlanMeta {
+export function parsePlanMeta(filePath: string): PlanMeta {
   const content = fs.readFileSync(filePath, "utf-8");
   const lines = content.split("\n");
   const name = path.basename(filePath, ".md");
@@ -76,7 +76,7 @@ function parsePlanMeta(filePath: string): PlanMeta {
   };
 }
 
-function parseWorkflows(filePath: string): WorkflowBlock[] {
+export function parseWorkflows(filePath: string): WorkflowBlock[] {
   const content = fs.readFileSync(filePath, "utf-8");
   const lines = content.split("\n");
   const workflows: WorkflowBlock[] = [];
@@ -95,7 +95,7 @@ function parseWorkflows(filePath: string): WorkflowBlock[] {
         workflows.push(current);
       }
       current = {
-        name: wfMatch[1].trim(),
+        name: wfMatch?.[1]?.trim() || `Workflow ${workflows.length + 1}`,
         steps: 0,
         edgeCases: 0,
         hasCleanup: false,
@@ -443,7 +443,105 @@ function cmdValidate(planName?: string) {
   console.log(`\n${validCount} valid, ${issueCount} with issues`);
 }
 
-function padRight(s: string, n: number): string {
+export function analyzeRouting(content: string): {
+  phase: string;
+  reason: string;
+} {
+  const vaguePatterns = [
+    /\bthe (login|submit|register|button|link|form|menu)\b/i,
+    /\b(verify|check|ensure|validate)\s+(layout|appearance|visual|look)/i,
+    /\b(manually|interactive|judgment)\b/i,
+    /CAPTCHA|MFA|OAuth|2FA/i,
+  ];
+
+  const specificPatterns = [
+    /data-testid|data-test|aria-label/i,
+    /\[.*\]|#\w+|\.\w+/,
+    /button:text|page\.\w+|input\[/i,
+    /waitFor|waitForSelector|waitForURL|waitForLoadState/i,
+  ];
+
+  const lower = content.toLowerCase();
+  const vagueHits = vaguePatterns.filter((r) => r.test(content)).length;
+  const specificHits = specificPatterns.filter((r) => r.test(content)).length;
+
+  if (vagueHits > 0 && specificHits === 0) {
+    return {
+      phase: "B",
+      reason:
+        "Steps contain vague selectors/instructions without specific alternatives; falls back to interactive control.",
+    };
+  }
+  if (content.includes("CAPTCHA") || content.includes("MFA")) {
+    return {
+      phase: "B",
+      reason:
+        "Unpredictable elements (CAPTCHA/MFA/OAuth) require interactive handling.",
+    };
+  }
+  if (vagueHits > specificHits) {
+    return {
+      phase: "B",
+      reason:
+        "More vague patterns than specific selectors; recommended to use interactive fallback.",
+    };
+  }
+  return {
+    phase: "A",
+    reason:
+      "Steps appear well-defined with specific selectors; suitable for Playwright script generation.",
+  };
+}
+
+function cmdRoute(planName?: string) {
+  const dir = plansDir();
+  if (!fs.existsSync(dir)) {
+    console.log(`${YELLOW}No .e2e-plans/ directory found.${RESET}`);
+    console.log(`Run ${CYAN}scaffold${RESET} first to create one.`);
+    return;
+  }
+
+  const files = planName
+    ? [path.join(dir, `${planName}.md`)]
+    : fs
+        .readdirSync(dir)
+        .filter((f) => f.endsWith(".md") && f !== "README.md")
+        .map((f) => path.join(dir, f));
+
+  if (files.length === 0) {
+    console.log(`${YELLOW}No plan files found. Nothing to route.${RESET}`);
+    return;
+  }
+
+  console.log(`\n${BOLD}${BLUE}Hybrid Execution Routing${RESET}\n`);
+  console.log(
+    `${CYAN}Phase A${RESET} = Playwright script generation  |  ${CYAN}Phase B${RESET} = Interactive browser control\n`,
+  );
+
+  for (const filePath of files) {
+    const meta = parsePlanMeta(filePath);
+    const content = fs.readFileSync(filePath, "utf-8");
+    const routing = analyzeRouting(content);
+
+    console.log(
+      `${BOLD}${meta.name}${RESET} → ${routing.phase === "A" ? `${GREEN}Phase ${routing.phase}${RESET}` : `${YELLOW}Phase ${routing.phase}${RESET}`}`,
+    );
+    console.log(`  ${routing.reason}`);
+
+    const workflows = parseWorkflows(filePath);
+    if (workflows.length > 0) {
+      console.log(`  ${CYAN}Workflows:${RESET}`);
+      for (const wf of workflows) {
+        console.log(
+          `    • ${wf.name} (${wf.steps} steps, ${wf.edgeCases} edge cases)`,
+        );
+      }
+    }
+    console.log();
+  }
+}
+
+export function padRight(s: string, n: number): string {
   return s.length < n ? s + " ".repeat(n - s.length) : s.substring(0, n);
 }
 
@@ -460,6 +558,7 @@ ${CYAN}Commands:${RESET}
     ${GREEN}index${RESET}                  Generate/update README index
     ${GREEN}check${RESET}                  Check if plans exist (output: absent|empty|list)
     ${GREEN}validate${RESET} [plan-name]   Validate plan structure (all or specific)
+    ${GREEN}route${RESET} [plan-name]      Show hybrid execution routing (Phase A vs Phase B)
 
 ${CYAN}Examples:${RESET}
     npx tsx ${__dirname}/e2e-plan-manager.ts list
@@ -468,6 +567,7 @@ ${CYAN}Examples:${RESET}
     npx tsx ${__dirname}/e2e-plan-manager.ts index
     npx tsx ${__dirname}/e2e-plan-manager.ts check
     npx tsx ${__dirname}/e2e-plan-manager.ts validate
+    npx tsx ${__dirname}/e2e-plan-manager.ts route
 `);
 }
 
@@ -479,7 +579,7 @@ switch (command) {
     cmdList();
     break;
   case "show":
-    cmdShow(arg);
+    cmdShow(arg as string);
     break;
   case "scaffold":
     cmdScaffold();
@@ -492,6 +592,9 @@ switch (command) {
     break;
   case "validate":
     cmdValidate(arg);
+    break;
+  case "route":
+    cmdRoute(arg);
     break;
   default:
     printUsage();
