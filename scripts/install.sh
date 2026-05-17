@@ -80,6 +80,7 @@ do_install() {
 
     # Also deploy to self-contained directory
     declare -A SELFCONTAINED=(
+        ["install.sh"]="$PREFIX/install.sh"
         ["primitive/e2e-tester.json"]="$PREFIX/primitive/e2e-tester.json"
         ["scripts/e2e-plan-manager.ts"]="$PREFIX/scripts/e2e-plan-manager.ts"
         ["references/e2e-execution-guide.md"]="$PREFIX/references/e2e-execution-guide.md"
@@ -127,6 +128,7 @@ do_install() {
     done
 
     # Make scripts executable
+    chmod +x "$PREFIX/install.sh" 2>/dev/null || true
     chmod +x "$PREFIX/scripts/e2e-plan-manager.ts" 2>/dev/null || true
     chmod +x "$BUILDER_DIR/scripts/e2e-plan-manager.ts" 2>/dev/null || true
 

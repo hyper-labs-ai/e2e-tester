@@ -1,6 +1,7 @@
 #!/usr/bin/env npx tsx
 import * as fs from "node:fs";
 import * as path from "node:path";
+import * as os from "node:os";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -582,6 +583,184 @@ export function padRight(s: string, n: number): string {
   return s.length < n ? s + " ".repeat(n - s.length) : s.substring(0, n);
 }
 
+interface InstallOptions {
+  symlink: boolean;
+  prefix: string;
+  agentsDir: string;
+  dryRun: boolean;
+}
+
+function parseInstallArgs(): InstallOptions {
+  const opts: InstallOptions = {
+    symlink: false,
+    prefix: path.join(os.homedir(), ".agents", "agents.d", "e2e-tester"),
+    agentsDir: path.join(os.homedir(), ".agents"),
+    dryRun: false,
+  };
+  const args = process.argv.slice(3);
+  for (let i = 0; i < args.length; i++) {
+    switch (args[i]) {
+      case "--symlink":
+        opts.symlink = true;
+        break;
+      case "--prefix":
+        opts.prefix = path.resolve(args[++i] || "");
+        break;
+      case "--agents":
+        opts.agentsDir = path.resolve(args[++i] || "");
+        break;
+      case "--dry-run":
+        opts.dryRun = true;
+        break;
+    }
+  }
+  return opts;
+}
+
+function copyRecursive(src: string, dst: string) {
+  const stat = fs.statSync(src);
+  if (stat.isDirectory()) {
+    fs.mkdirSync(dst, { recursive: true });
+    for (const entry of fs.readdirSync(src)) {
+      copyRecursive(path.join(src, entry), path.join(dst, entry));
+    }
+  } else {
+    fs.mkdirSync(path.dirname(dst), { recursive: true });
+    fs.copyFileSync(src, dst);
+  }
+}
+
+function cmdInstall() {
+  const opts = parseInstallArgs();
+  const repoDir = path.resolve(__dirname, "..");
+  const builderDir = path.join(opts.agentsDir, "skills", "agent-builder");
+  const version = loadVersion(repoDir);
+
+  const isWin = os.platform() === "win32";
+
+  if (opts.symlink && isWin) {
+    console.error(
+      `${RED}Error: --symlink is not supported on Windows. Use WSL or omit --symlink.${RESET}`,
+    );
+    process.exit(1);
+  }
+
+  printStep(
+    `Installing E2E Tester ${version ? "v" + version : ""} to ${opts.prefix}`,
+  );
+
+  const files: Record<string, string> = {
+    "primitive/e2e-tester.json": `${builderDir}/primitives/definitions/e2e-tester.json`,
+    "scripts/e2e-plan-manager.ts": `${builderDir}/scripts/e2e-plan-manager.ts`,
+    "references/e2e-execution-guide.md": `${builderDir}/references/e2e-execution-guide.md`,
+    "workflows/e2e-test-workflow.json": `${builderDir}/composer/examples/e2e-test-workflow.json`,
+  };
+
+  const selfContained: Record<string, string> = {
+    "install.sh": `${opts.prefix}/install.sh`,
+    "primitive/e2e-tester.json": `${opts.prefix}/primitive/e2e-tester.json`,
+    "scripts/e2e-plan-manager.ts": `${opts.prefix}/scripts/e2e-plan-manager.ts`,
+    "scripts/install.sh": `${opts.prefix}/scripts/install.sh`,
+    "references/e2e-execution-guide.md": `${opts.prefix}/references/e2e-execution-guide.md`,
+    "workflows/e2e-test-workflow.json": `${opts.prefix}/workflows/e2e-test-workflow.json`,
+    "README.md": `${opts.prefix}/README.md`,
+    LICENSE: `${opts.prefix}/LICENSE`,
+    "package.json": `${opts.prefix}/package.json`,
+  };
+
+  const allFiles = { ...files, ...selfContained };
+
+  if (opts.dryRun) {
+    printStep("[DRY RUN] Would install:");
+    for (const [src, dst] of Object.entries(allFiles)) {
+      const srcPath = path.join(repoDir, src);
+      console.log(`  ${src} → ${dst}`);
+      if (!fs.existsSync(srcPath)) {
+        console.log(`    ${YELLOW}⚠ source missing: ${srcPath}${RESET}`);
+      }
+    }
+    console.log(`\n  Mode: ${opts.symlink ? "symlink" : "copy"}`);
+    printOk("Dry run complete — no changes made");
+    return;
+  }
+
+  // Create directories
+  for (const dst of Object.values(allFiles)) {
+    fs.mkdirSync(path.dirname(dst), { recursive: true });
+  }
+
+  // Deploy files
+  let deployed = 0;
+  let skipped = 0;
+  for (const [src, dst] of Object.entries(allFiles)) {
+    const srcPath = path.join(repoDir, src);
+    if (!fs.existsSync(srcPath)) {
+      skipped++;
+      continue;
+    }
+    if (opts.symlink) {
+      try {
+        fs.unlinkSync(dst);
+      } catch {}
+      fs.symlinkSync(srcPath, dst);
+    } else {
+      fs.copyFileSync(srcPath, dst);
+    }
+    deployed++;
+  }
+
+  // chmod scripts on non-Windows
+  if (!isWin) {
+    try {
+      fs.chmodSync(`${opts.prefix}/install.sh`, 0o755);
+    } catch {}
+    try {
+      fs.chmodSync(`${opts.prefix}/scripts/e2e-plan-manager.ts`, 0o755);
+    } catch {}
+    try {
+      fs.chmodSync(`${builderDir}/scripts/e2e-plan-manager.ts`, 0o755);
+    } catch {}
+  }
+
+  // Create results/screenshots dirs
+  fs.mkdirSync(`${opts.prefix}/results`, { recursive: true });
+  fs.mkdirSync(`${opts.prefix}/screenshots`, { recursive: true });
+
+  printOk(
+    `Deployed ${deployed} file(s)${skipped > 0 ? ` (${skipped} skipped)` : ""}`,
+  );
+
+  if (fs.existsSync(`${builderDir}/primitives/definitions/e2e-tester.json`)) {
+    printOk(
+      `Primitive registered: e2e-tester${version ? " (v" + version + ")" : ""}`,
+    );
+  }
+
+  console.log(
+    `\n  ${CYAN}Run${NC} ${GREEN}agent-compose list${NC} ${CYAN}to verify installation${NC}`,
+  );
+}
+
+function loadVersion(repoDir: string): string {
+  try {
+    const pkg = JSON.parse(
+      fs.readFileSync(path.join(repoDir, "package.json"), "utf-8"),
+    );
+    return pkg.version || "";
+  } catch {
+    return "";
+  }
+}
+
+const NC = "\x1b[0m";
+
+function printStep(msg: string) {
+  console.log(`${BLUE}==>${NC} ${msg}`);
+}
+function printOk(msg: string) {
+  console.log(`  ${GREEN}✓${NC} ${msg}`);
+}
+
 function printUsage() {
   console.log(`
 ${BLUE}E2E Plan Manager${RESET}
@@ -596,15 +775,21 @@ ${CYAN}Commands:${RESET}
     ${GREEN}check${RESET}                  Check if plans exist (output: absent|empty|list)
     ${GREEN}validate${RESET} [plan-name]   Validate plan structure (all or specific)
     ${GREEN}route${RESET} [plan-name]      Show hybrid execution routing (Tier A/B/C)
+    ${GREEN}install${RESET} [options]      Deploy E2E Tester to agent system (cross-platform)
+
+${CYAN}Install Options:${RESET}
+    --symlink              Symlink for development (Linux/macOS)
+    --prefix <dir>         Custom prefix (default: ~/.agents/agents.d/e2e-tester)
+    --agents <dir>         Agent builder directory (default: ~/.agents)
+    --dry-run              Preview without copying
 
 ${CYAN}Examples:${RESET}
     npx tsx ${__dirname}/e2e-plan-manager.ts list
-    npx tsx ${__dirname}/e2e-plan-manager.ts show my-plan
+    npx tsx ${__dirname}/e2e-plan-manager.ts install
+    npx tsx ${__dirname}/e2e-plan-manager.ts install --symlink
+    npx tsx ${__dirname}/e2e-plan-manager.ts install --prefix ~/custom
+    npx tsx ${__dirname}/e2e-plan-manager.ts install --dry-run
     npx tsx ${__dirname}/e2e-plan-manager.ts scaffold
-    npx tsx ${__dirname}/e2e-plan-manager.ts index
-    npx tsx ${__dirname}/e2e-plan-manager.ts check
-    npx tsx ${__dirname}/e2e-plan-manager.ts validate
-    npx tsx ${__dirname}/e2e-plan-manager.ts route
 `);
 }
 
@@ -632,6 +817,9 @@ switch (command) {
     break;
   case "route":
     cmdRoute(arg);
+    break;
+  case "install":
+    cmdInstall();
     break;
   default:
     printUsage();

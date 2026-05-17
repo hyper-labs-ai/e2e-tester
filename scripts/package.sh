@@ -84,6 +84,7 @@ PACKAGE_DIR="$BUILD_DIR/$FILENAME"
 mkdir -p "$PACKAGE_DIR"/{primitive,scripts,references,workflows}
 
 # Copy files
+cp "$REPO_DIR/install.sh" "$PACKAGE_DIR/" 2>/dev/null || true
 cp "$REPO_DIR/AGENTS.md" "$PACKAGE_DIR/" 2>/dev/null || true
 cp "$REPO_DIR/README.md" "$PACKAGE_DIR/"
 cp "$REPO_DIR/LICENSE" "$PACKAGE_DIR/"
@@ -98,7 +99,7 @@ cp "$REPO_DIR/references/e2e-execution-guide.md" "$PACKAGE_DIR/references/"
 cp "$REPO_DIR/workflows/e2e-test-workflow.json" "$PACKAGE_DIR/workflows/"
 
 # Make scripts executable
-chmod +x "$PACKAGE_DIR/scripts/install.sh"
+chmod +x "$PACKAGE_DIR/install.sh" "$PACKAGE_DIR/scripts/install.sh"
 chmod +x "$PACKAGE_DIR/scripts/e2e-plan-manager.ts"
 
 print_ok "Files staged at $BUILD_DIR/$FILENAME"

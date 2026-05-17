@@ -16,7 +16,7 @@
   "author": "Hyper Labs AI",
   "type": "module",
   "scripts": {
-    "install": "bash scripts/install.sh",
+    "install": "npx tsx scripts/e2e-plan-manager.ts install",
     "package": "bash scripts/package.sh",
     "format": "npx prettier --write .",
     "list": "npx tsx scripts/e2e-plan-manager.ts list",
